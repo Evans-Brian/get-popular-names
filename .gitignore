@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Data folder
+data/
+data/*
+
+# Lambda deployment files
+lambda_function.zip
+output-*.json
+test-event-*.json
+
+# AWS credentials
+.aws/
+.aws/*
+
+# Temporary files
+temp_lambda/
+*.tmp
+
+# Custom file types
+*.mdc
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS specific files
+.DS_Store
+Thumbs.db 
