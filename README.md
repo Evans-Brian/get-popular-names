@@ -1,6 +1,6 @@
-# Lambda Function Deployment Tool
+# Get Popular Names - Lambda Function
 
-This tool helps you deploy and update the `get-popular-names-by-state` Lambda function on AWS.
+This tool helps you deploy and update the `get-popular-names-by-state` Lambda function on AWS. The function retrieves popular names from a DynamoDB table based on state and bucket parameters.
 
 ## Prerequisites
 
@@ -25,13 +25,40 @@ This tool helps you deploy and update the `get-popular-names-by-state` Lambda fu
 - `lambda_function.py` - The main Lambda function code
 - `create_deployment.py` - Script to package and deploy the Lambda function
 - `deploy_lambda.ps1` - PowerShell script to automate the deployment process
+- `populate_ddb_with_names.py` - Script to populate DynamoDB with names data
 - `requirements.txt` - Python dependencies
+
+## Data Structure
+
+The project uses a DynamoDB table named "StateNames" with the following structure:
+
+- **Partition Key**: `State` (2-letter state code)
+- **Attributes**:
+  - `stateBucket1` through `stateBucket4`: Lists of names for each state
+  - `otherNamesBucket1` and `otherNamesBucket2`: Lists of international names
+  - Various count attributes for statistics
+
+Each state has 4 buckets of names, with each bucket containing up to 3950 characters worth of names.
 
 ## Usage
 
 ### Modifying the Lambda Function
 
 To modify the Lambda function, edit the `lambda_function.py` file directly. This file contains the actual code that will be deployed to AWS Lambda.
+
+### Populating DynamoDB
+
+To populate the DynamoDB table with names data:
+
+```
+python populate_ddb_with_names.py
+```
+
+This script will:
+1. Process state name data files from the `data/states` directory
+2. Create 4 state buckets for each state, with a maximum size of 3950 characters each
+3. Create 2 international name buckets for each state
+4. Write the data to the DynamoDB table
 
 ### Automated Deployment (Recommended)
 
@@ -46,8 +73,8 @@ This script will:
 2. Install required Python packages
 3. Create a deployment package from `lambda_function.py`
 4. Update the Lambda function code
-5. Test the function with sample events (both direct invocation and API Gateway)
-6. Save the responses to `output-direct.json` and `output-api.json`
+5. Test the function with sample events
+6. Save the responses to output files
 
 ### Manual Deployment
 
@@ -61,19 +88,24 @@ This script will:
 1. Verify that `lambda_function.py` exists
 2. Create a ZIP deployment package
 3. Update the Lambda function on AWS
-4. Create test event files for both direct invocation and API Gateway
+4. Create test event files for different scenarios
 5. Test the function and save the responses
 
 ### Testing the Lambda Function Separately
 
 After updating the function, you can test it using the AWS CLI:
 
-#### Direct Invocation
+#### State Bucket Test
 ```
-aws lambda invoke --function-name get-popular-names-by-state --payload file://test-event-direct.json --region us-east-2 output-direct.json
+aws lambda invoke --function-name get-popular-names-by-state --payload file://test-event-state.json --region us-east-2 output-state.json
 ```
 
-#### API Gateway Event
+#### Other Names Bucket Test
+```
+aws lambda invoke --function-name get-popular-names-by-state --payload file://test-event-other.json --region us-east-2 output-other.json
+```
+
+#### API Gateway Test
 ```
 aws lambda invoke --function-name get-popular-names-by-state --payload file://test-event-api.json --region us-east-2 output-api.json
 ```
@@ -85,7 +117,7 @@ aws lambda invoke --function-name get-popular-names-by-state --payload file://te
 - **Runtime**: Python 3.9
 - **Handler**: `lambda_function.lambda_handler`
 
-The function queries a DynamoDB table named "StateNames" based on a state code and bucket number, returning a list of names.
+The function queries a DynamoDB table named "StateNames" based on a state code and bucket name, returning a list of names.
 
 ### Input Formats
 
@@ -93,14 +125,18 @@ The function queries a DynamoDB table named "StateNames" based on a state code a
 ```json
 {
   "state": "OH",
-  "bucketNumber": 1
+  "bucket": "stateBucket1"
 }
 ```
+
+Valid bucket values:
+- `stateBucket1` through `stateBucket4` - State-specific name buckets
+- `otherNamesBucket1` and `otherNamesBucket2` - International name buckets
 
 #### API Gateway Event
 ```json
 {
-  "body": "{\"call\":{\"transcript_with_tool_calls\":[{\"tool_call_id\":\"tool_call_id\",\"name\":\"get_names_bucket_1\",\"arguments\":\"{\\\"bucketNumber\\\":1,\\\"state\\\":\\\"OH\\\"}\"}]},\"name\":\"get_names_bucket_1\",\"args\":{\"bucketNumber\":1,\"state\":\"OH\"}}"
+  "body": "{\"call\":{\"transcript_with_tool_calls\":[{\"tool_call_id\":\"tool_call_id\",\"name\":\"get_names_bucket\",\"arguments\":\"{\\\"bucket\\\":\\\"stateBucket1\\\",\\\"state\\\":\\\"OH\\\"}\"}]},\"name\":\"get_names_bucket\",\"args\":{\"bucket\":\"stateBucket1\",\"state\":\"OH\"}}"
 }
 ```
 
@@ -111,9 +147,9 @@ A list of names in the specified bucket:
 
 ```json
 [
-  "Emma",
-  "Olivia",
-  "Ava",
+  "Michael",
+  "David",
+  "James",
   ...
 ]
 ```
@@ -136,7 +172,7 @@ Or an error message if something goes wrong:
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token"
   },
-  "body": "[\"Emma\",\"Olivia\",\"Ava\",...]"
+  "body": "[\"Michael\",\"David\",\"James\",...]"
 }
 ```
 
@@ -155,18 +191,26 @@ The function can parse requests from API Gateway in the following format:
     "transcript_with_tool_calls": [
       {
         "tool_call_id": "tool_call_id",
-        "name": "get_names_bucket_1",
-        "arguments": "{\"bucketNumber\":1,\"state\":\"OH\"}"
+        "name": "get_names_bucket",
+        "arguments": "{\"bucket\":\"stateBucket1\",\"state\":\"OH\"}"
       }
     ]
   },
-  "name": "get_names_bucket_1",
+  "name": "get_names_bucket",
   "args": {
-    "bucketNumber": 1,
+    "bucket": "stateBucket1",
     "state": "OH"
   }
 }
 ```
+
+## Error Handling
+
+The Lambda function includes comprehensive error handling for:
+- Missing or invalid parameters
+- Invalid bucket formats
+- Invalid bucket numbers (must be 1-4 for state buckets, 1-2 for other names buckets)
+- DynamoDB access errors
 
 ## Troubleshooting
 
