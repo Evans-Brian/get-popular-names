@@ -28,6 +28,14 @@ This tool helps you deploy and update the `get-popular-names-by-state` Lambda fu
 - `populate_ddb_with_names.py` - Script to populate DynamoDB with names data
 - `requirements.txt` - Python dependencies
 
+## Data Sources
+
+This project uses the following data sources:
+
+- **State-level name data**: The U.S. Social Security Administration provides state-specific baby name data, which can be downloaded from [SSA.gov](https://www.ssa.gov/oact/babynames/limits.html). This data includes names given to babies born in each state from 1910 onwards.
+
+- **International names**: Global name data was sourced from [Forebears.io](https://forebears.io/earth/forenames), which provides a comprehensive database of forenames from around the world.
+
 ## Data Structure
 
 The project uses a DynamoDB table named "StateNames" with the following structure:
